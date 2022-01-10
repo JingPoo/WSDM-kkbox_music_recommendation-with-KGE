@@ -26,7 +26,76 @@ def batch(iterable, n = 1):
             current_batch = []
     if current_batch:
         yield current_batch
+
+def recommend(user_list):
+    '''
+    A function to recommend 25 musics for each user in the input user list
+
+        Parameter
+        ---------
+            user_list: list of user id
         
+        Return
+        ------
+            dict: top 25 recommend songs for list of users
+    '''
+    # - input: list of user id
+    # - output: list of recommend item (25 recommend songs for each user)
+    # - logic:
+    #     1. user id → user embedding
+    #     2. a = user embedding + has_insterest embedding
+    #     3. compare distance with all item embeddings, output the nearest 25 items
+
+    test_users_rec_music = {}
+    for users in tqdm.tqdm(batch(user_list,100), total=len(user_list)//100+1):
+        remain_user_list=[]
+        inference_user_list=[]
+        for user in users:
+            if users_type[user]=='remain':
+                remain_user_list.append(user)
+            else:
+                inference_user_list.append(user)
+
+        # users embedding (batch_users * embedding_size)
+        users_index = [metadata['ent2ind'].get(user) for user in remain_user_list]
+        remain_users_emb = tf.nn.embedding_lookup(model.model_weights['ent_emb'], users_index)
+        inference_users_emb = tf.convert_to_tensor([user_and_inferenceEmb[user].numpy() for user in inference_user_list])
+        users_emb = tf.concat([remain_users_emb,inference_users_emb], 0)
+
+        # has_interest embedding (1 * embedding_size )
+        has_interest_index = metadata['rel2ind']['has_interest']
+        has_interest_emb = model.model_weights['rel_emb'][has_interest_index]
+        
+        # compute recommend songs (batch_users * embedding_size)
+        compute_songs_emb = users_emb + has_interest_emb
+
+        with open('./data/KKBOX/entity_groupby_type.json') as f:
+            entity_groupby_type = json.load(f)
+
+        # songs embedding (total_songs * embedding_size)
+        song_id = [metadata['ent2ind'].get(ent) for ent in entity_groupby_type['song']]
+        songs_emb = tf.nn.embedding_lookup(model.model_weights['ent_emb'], song_id)
+
+        # 用matrix計算，算完全部compute_songs_emb (list) 與 全部songs_emb(list)的距離 (batch_users * total_songs)
+        distances = [] 
+        # for each user
+        for i in range(compute_songs_emb.shape[0]):
+            # calculate his rec_music embedding distance to all songs embeddings
+            distances.append(tf.norm(tf.subtract(songs_emb, compute_songs_emb[i]), ord=2, axis=1))
+
+        # 每個人的前25首embedding相似的song index (batch_users * 25)
+        top_25_songs_index = tf.argsort(distances)[:,:25].numpy().tolist() 
+
+        # song index to song id (batch_users * 25)
+        song_ent = tf.convert_to_tensor(np.array(entity_groupby_type['song']))
+        top_25_songs = tf.nn.embedding_lookup(song_ent, top_25_songs_index)
+
+        # zip users and their rec_25_songs into a dict
+        users_top25_songs =  dict(zip(users,top_25_songs))
+        test_users_rec_music.update(users_top25_songs)
+    
+    return test_users_rec_music
+
 def inference_recommend(user_list):
     '''
     A function to recommend 25 musics for each user in the input user list
@@ -320,12 +389,12 @@ for inference_proportion in [0.7, 0.5, 0.3]:
         mlflow.log_artifact(fig_fn) # logging to mlflow
         plt.close()
         
-        # # MLflow log artifact 2. model weights
-        # model_weights = {'ent_emb': model.model_weights['ent_emb'].numpy().tolist(),
-        #                 'rel_emb': model.model_weights['rel_emb'].numpy().tolist()}
-        # with open("./data/KKBOX/model_weights.json", 'w') as f:
-        #         json.dump(model_weights, f)
-        # mlflow.log_artifact('./data/KKBOX/model_weights.json')
+        # MLflow log artifact 2. model weights
+        model_weights = {'ent_emb': model.model_weights['ent_emb'].numpy().tolist(),
+                        'rel_emb': model.model_weights['rel_emb'].numpy().tolist()}
+        with open("./data/KKBOX/model_weights.json", 'w') as f:
+                json.dump(model_weights, f)
+        mlflow.log_artifact('./data/KKBOX/model_weights.json')
 
         # INFERENCE user embedding
         grouped_train_inference = pd.DataFrame(train_inference.groupby('h'))
@@ -349,15 +418,23 @@ for inference_proportion in [0.7, 0.5, 0.3]:
                 inference_users.append(user)
 
         # recommend and evaluate on TEST data
+        test_users_rec_music = recommend(test_users)
+        test_evaluate_result = evaluate(test_users_rec_music)
+
+        # recommend and evaluate on remain user
         remain_users_rec_music = remain_recommend(remain_users)
         remain_evaluate_result = evaluate(remain_users_rec_music)
-
+        # recommend and evaluate on inference user
         inference_users_rec_music = inference_recommend(inference_users)
         inference_evaluate_result = evaluate(inference_users_rec_music)
 
         # write in tensorboard log
         summary_writer = tf.summary.create_file_writer(log_path)
         with summary_writer.as_default():
+            tf.summary.scalar('test-hit', test_evaluate_result['hit'], step=0)
+            tf.summary.scalar('test-recall', test_evaluate_result['recall'], step=0)
+            tf.summary.scalar('test-precision', test_evaluate_result['precision'], step=0)
+            tf.summary.scalar('test-ndcg', test_evaluate_result['ndcg'], step=0)
             tf.summary.scalar('test-remain-hit', remain_evaluate_result['hit'], step=0)
             tf.summary.scalar('test-remain-recall', remain_evaluate_result['recall'], step=0)
             tf.summary.scalar('test-remain-precision', remain_evaluate_result['precision'], step=0)
@@ -368,6 +445,10 @@ for inference_proportion in [0.7, 0.5, 0.3]:
             tf.summary.scalar('test-inference-ndcg', inference_evaluate_result['ndcg'], step=0)
         
         # MLflow log metrics
+        mlflow.log_metric('test-hit', test_evaluate_result['hit'])
+        mlflow.log_metric('test-recall', test_evaluate_result['recall'])
+        mlflow.log_metric('test-precision', test_evaluate_result['precision'])
+        mlflow.log_metric('test-ndcg', test_evaluate_result['ndcg'])
         mlflow.log_metric('test-remain-hit', remain_evaluate_result['hit'])
         mlflow.log_metric('test-remain-recall', remain_evaluate_result['recall'])
         mlflow.log_metric('test-remain-precision', remain_evaluate_result['precision'])
