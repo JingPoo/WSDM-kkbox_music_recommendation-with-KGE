@@ -252,9 +252,9 @@ def inferenceUser(user_df):
 
 mlflow.set_experiment('KKBOX-MusicRecommend-inference2')
 
+emb_size = 30
 neg_ratio = 32
-emb_size = 20
-epoch = 100
+epoch = 200
 for inference_proportion in [0.7, 0.5, 0.3]:
 
     run_name = 'inference'+ str(int(inference_proportion*100))\
@@ -302,7 +302,7 @@ for inference_proportion in [0.7, 0.5, 0.3]:
         # train the model
         model.train(train_X=train_remain, val_X=valid, metadata=metadata, epochs=epoch, batch_size=10000,
             early_stopping_rounds=10, restore_best_weight=False,
-            optimizer=tf.optimizers.Adam(learning_rate=0.0001),
+            optimizer=tf.optimizers.Adam(learning_rate=0.001),
             seed=12345, log_path=log_path, log_projector=False)
         
         # MLflow log artifact 1.training and validation loss curve
