@@ -178,7 +178,7 @@ mlflow.set_experiment('KKBOX-MusicRecommend')
 
 emb_size = 30
 neg_ratio = 32
-epoch = 100
+epoch = 200
 
 run_name = 'TEST-emb' + str(emb_size) + 'neg' + str(neg_ratio) + 'epoch' + str(epoch)
 log_path = './tensorboard_logs/TEST-emb' + str(emb_size) + 'neg' + str(neg_ratio) + 'epoch' + str(epoch)
@@ -207,7 +207,7 @@ with mlflow.start_run(run_name = run_name):
     # train the model
     model.train(train_X=train, val_X=valid, metadata=metadata, epochs=epoch, batch_size=10000,
                 early_stopping_rounds=10, restore_best_weight=False,
-                optimizer=tf.optimizers.Adam(learning_rate=0.0001),
+                optimizer=tf.optimizers.Adam(learning_rate=0.001),
                 seed=12345, log_path=log_path, log_projector=False)
 
     # MLflow log artifact 1.training and validation loss curve
