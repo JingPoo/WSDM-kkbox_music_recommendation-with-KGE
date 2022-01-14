@@ -259,6 +259,8 @@ def evaluate(test_users_rec_music):
         -------
             metric_result(dict): metric include hit, recall, precision and NDCG
     '''
+
+    Popular_rec_list = []
     TP_list = [] # each user's True Positive number
     ans_lengths = [] # each user's has_interest music number
     ndcg_list = []
@@ -268,16 +270,19 @@ def evaluate(test_users_rec_music):
         rec_music_list = [x.decode() for x in test_users_rec_music[user].numpy().tolist()]
         TP_list.append(len(intersection(rec_music_list, ans_music_list)))
         ndcg_list.append(NDCG(rec_music_list, ans_music_list))
+        Popular_rec_list.append(len(intersection(rec_music_list, top25songs)))
         
     hit_list = [1 if TP >= 1 else 0 for TP in TP_list]
     precision_list = [TP/25 for TP in TP_list]
     recall_list = [TP_list[i]/ans_lengths[i] for i in range(len(TP_list))]
+    Popular_rec_list = [hit_count/25 for hit_count in Popular_rec_list]
 
     metric_result = {
         'hit': statistics.mean(hit_list),
         'recall': statistics.mean(recall_list),
         'precision': statistics.mean(precision_list),
-        'ndcg': statistics.mean(ndcg_list)
+        'ndcg': statistics.mean(ndcg_list),
+        'Popular_rec_rate': statistics.mean(Popular_rec_list)
     }
 
     return metric_result
@@ -407,6 +412,7 @@ for inference_proportion in [0.7, 0.5, 0.3]:
         # generate test data
         test_df = pd.read_csv('./data/KKBOX/test_data.csv')
         test_users, user_and_hasInterestItem  = generateTestData(test_df)
+        top25songs = test_df['t'].value_counts().head(25).index.tolist()
 
         # Test users -> remain users & inference users
         remain_users=[]
@@ -435,25 +441,31 @@ for inference_proportion in [0.7, 0.5, 0.3]:
             tf.summary.scalar('test-recall', test_evaluate_result['recall'], step=0)
             tf.summary.scalar('test-precision', test_evaluate_result['precision'], step=0)
             tf.summary.scalar('test-ndcg', test_evaluate_result['ndcg'], step=0)
+            tf.summary.scalar('test-Popular_rec_rate',test_evaluate_result['Popular_rec_rate'], step=0)
             tf.summary.scalar('test-remain-hit', remain_evaluate_result['hit'], step=0)
             tf.summary.scalar('test-remain-recall', remain_evaluate_result['recall'], step=0)
             tf.summary.scalar('test-remain-precision', remain_evaluate_result['precision'], step=0)
             tf.summary.scalar('test-remain-ndcg', remain_evaluate_result['ndcg'], step=0)
+            tf.summary.scalar('test-remain-Popular_rec_rate',remain_evaluate_result['Popular_rec_rate'], step=0)
             tf.summary.scalar('test-inference-hit', inference_evaluate_result['hit'], step=0)
             tf.summary.scalar('test-inference-recall', inference_evaluate_result['recall'], step=0)
             tf.summary.scalar('test-inference-precision', inference_evaluate_result['precision'], step=0)
             tf.summary.scalar('test-inference-ndcg', inference_evaluate_result['ndcg'], step=0)
+            tf.summary.scalar('test-inference-Popular_rec_rate',inference_evaluate_result['Popular_rec_rate'], step=0)
         
         # MLflow log metrics
         mlflow.log_metric('test-hit', test_evaluate_result['hit'])
         mlflow.log_metric('test-recall', test_evaluate_result['recall'])
         mlflow.log_metric('test-precision', test_evaluate_result['precision'])
         mlflow.log_metric('test-ndcg', test_evaluate_result['ndcg'])
+        mlflow.log_metric('test-Popular_rec_rate',test_evaluate_result['Popular_rec_rate'])
         mlflow.log_metric('test-remain-hit', remain_evaluate_result['hit'])
         mlflow.log_metric('test-remain-recall', remain_evaluate_result['recall'])
         mlflow.log_metric('test-remain-precision', remain_evaluate_result['precision'])
         mlflow.log_metric('test-remain-ndcg', remain_evaluate_result['ndcg'])
+        mlflow.log_metric('test-remain-Popular_rec_rate',remain_evaluate_result['Popular_rec_rate'])
         mlflow.log_metric('test-inference-hit', inference_evaluate_result['hit'])
         mlflow.log_metric('test-inference-recall', inference_evaluate_result['recall'])
         mlflow.log_metric('test-inference-precision', inference_evaluate_result['precision'])
         mlflow.log_metric('test-inference-ndcg', inference_evaluate_result['ndcg'])
+        mlflow.log_metric('test-inference-Popular_rec_rate',inference_evaluate_result['Popular_rec_rate'])
