@@ -98,7 +98,7 @@ def recommend(user_list):
 
 def inference_recommend(user_list):
     '''
-    A function to recommend 25 musics for each user in the input user list
+    A function to recommend 25 musics for each user in the "inference" user list
 
         Parameter
         ---------
@@ -108,12 +108,6 @@ def inference_recommend(user_list):
         ------
             dict: top 25 recommend songs for list of users
     '''
-    # - input: list of user id
-    # - output: list of recommend item (25 recommend songs for each user)
-    # - logic:
-    #     1. user id → user embedding
-    #     2. a = user embedding + has_insterest embedding
-    #     3. compare distance with all item embeddings, output the nearest 25 items
 
     test_users_rec_music = {}
     for users in tqdm.tqdm(batch(user_list,100), total=len(user_list)//100+1):
@@ -157,7 +151,7 @@ def inference_recommend(user_list):
 
 def remain_recommend(user_list):
     '''
-    A function to recommend 25 musics for each user in the input user list
+    A function to recommend 25 musics for each user in the "remain" user list
 
         Parameter
         ---------
@@ -253,7 +247,6 @@ def evaluate(test_users_rec_music):
         Parameters
         ----------
             test_users_rec_music(dict): top 25 recommended songs for each user
-            log_path: the path to write in tensorboard log
 
         Returns
         -------
