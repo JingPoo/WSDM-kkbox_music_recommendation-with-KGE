@@ -2,3 +2,4 @@
 KAGGLE WSDM-kkbox_music_recommendation challenge with Knowledge graph embedding(KGE)
 
 data -> https://www.kaggle.com/c/kkbox-music-recommendation-challenge/data
+KGE package -> https://github.com/melissakou/knowledge-graph-embedding
