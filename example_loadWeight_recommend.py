@@ -122,7 +122,6 @@ def evaluate(test_users_rec_music):
         Parameters
         ----------
             test_users_rec_music(dict): top 25 recommended songs for each user
-            log_path: the path to write in tensorboard log
 
         Returns
         -------
